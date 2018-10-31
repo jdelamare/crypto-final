@@ -21,34 +21,27 @@ fn main() {
 
 fn handle_connection(mut stream: TcpStream) {
     // create a buffer for the request 
-//    let mut request = [0;512];
-    let mut request = String::new();
+    let mut request = [0;512];
     // read the request from the stream (their public key)
-//    stream.read(&mut request).unwrap();
-    println!("hello");
-    let _ = stream.read_to_string(&mut request);
-    println!("world");
-    stream.flush().unwrap();
-    println!("request = {:?}", request);
+    stream.read(&mut request).unwrap();
     // read in the public key for this server (my public key)
-    let contents = fs::read_to_string("pub_key").unwrap();
-    // generating a response object to indicate that everything is ok REMOVE?
-    let response = format!("HTTP/1.1 200 OK\r\n\r\n{}", contents);
+    let response = fs::read_to_string("pub_key").unwrap();
     // respond to the request with my public key
-    stream.write(contents.as_bytes()).unwrap();
-
-    stream.flush().unwrap();
-
- //   println!("Request: {}", String::from_utf8_lossy(&request[..]));
-//    fs::write("session_key", String::from_utf8_lossy(&request[..]));
-    panic!();
+    stream.write(response.as_bytes()).unwrap();
+    // now deal with their request by moving it from buffer to string
+    let mut their_pub_key = String::from_utf8_lossy(&request[..]).to_string();
+    // the string contains a lot of \u{0}, remove them.
+    sanitize_their_pub_key(&mut their_pub_key);
+    // their sanitized public key is temporarily held in the session_key file 
+    fs::write("session_key", their_pub_key);
+    // generate the session key with the gathered information
     create_session_key();
 }
 
 fn create_pub_key() {
     // Setting g = 2 results in pub_key = 0. wrapping_pow bug?
     let g: u32 = 3;  
-    let p: u32 = 12341234; // using this mod until big num is implemented
+    let p: u32 = 7; // using this mod until big num is implemented
     let a = fs::read_to_string("priv_key").unwrap();
     match a.parse::<u32>() {
         Ok(a) => {
@@ -62,6 +55,7 @@ fn create_pub_key() {
 fn create_priv_key() {
     let mut rng = rand::thread_rng();
     let priv_key: u32 = rng.gen();        
+    let priv_key =  priv_key % 7;
     fs::write("priv_key", priv_key.to_string());
 }
 
@@ -79,7 +73,10 @@ fn create_session_key() {
             match their_pub_key.parse::<u32>() {
                 Ok(y) => {
                     // my priv key is x, their pub key is y
-                    let session_key = x.wrapping_mul(y);
+                    println!("my priv: {:?}\ntheir pub {:?}", x, y); 
+//                    let session_key = y.wrapping_pow(x) % 7;
+                    let session_key = y.pow(x) % 7;
+                    println!("session: {:?}", session_key);
                     // write session key to file
                     fs::write("session_key", session_key.to_string());
                 },
@@ -88,4 +85,8 @@ fn create_session_key() {
         },
         _ => panic!("create session key")
     }
+}
+
+fn sanitize_their_pub_key(response: &mut String) {
+    response.retain(|c| c != '\u{0}');
 }

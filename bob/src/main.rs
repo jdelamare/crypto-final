@@ -18,27 +18,21 @@ fn main() {
 fn connect(mut stream: TcpStream) {
     // create a buffer for the response 
     let mut response = [0;512];
-//    let mut response = String::new(); STRING
     // read the public key from file into request
     let request = fs::read_to_string("pub_key").unwrap();
-//    let request = fs::read_to_string("pub_key").unwrap(); STRING
-    // send the request to the stream  
-    // currently no concept of overflowing the server. stores data in
-    // string, maybe leverage for stack overflow attack?
+    // send the request to the stream  *
     stream.write(request.as_bytes()).unwrap();
     // the stream carries the response back into response buffer
     stream.read(&mut response);
-    //println!("{:?}", String::from_utf8_lossy(&response[..]));
-    let x = String::from_utf8_lossy(&response[..]).to_string();
-    println!("{}", x);
+    let mut their_pub_key = String::from_utf8_lossy(&response[..]).to_string();
+    sanitize_their_pub_key(&mut their_pub_key);
     // write the response to file. session key partially created
-    fs::write("session_key", x); //STRING
-    
+    fs::write("session_key", their_pub_key); //STRING
 }
 
 fn create_pub_key() {
     let g: u32 = 3;
-    let p: u32 = 12341234;
+    let p: u32 = 7;
     let a = fs::read_to_string("priv_key").unwrap();
     match a.parse::<u32>() {
         Ok(a) => {
@@ -52,6 +46,7 @@ fn create_pub_key() {
 fn create_priv_key() {
     let mut rng = rand::thread_rng();
     let priv_key: u32 = rng.gen();    
+    let priv_key = priv_key % 7;
     fs::write("priv_key", priv_key.to_string());
 }
 
@@ -65,11 +60,15 @@ fn create_session_key() {
             // take their public key from session key file
             let their_pub_key = fs::read_to_string("session_key")
                                     .unwrap();
+            println!("debug: {:?}", their_pub_key);
             // parse their public key 
             match their_pub_key.parse::<u32>() {
                 Ok(y) => {
                     // my priv key is x, their pub key is y
-                    let session_key = x.wrapping_mul(y);
+                    println!("my priv: {:?}\ntheir pub {:?}", x, y);
+//                    let session_key = y.wrapping_pow(x) % 37;
+                    let session_key = y.pow(x) % 7;
+                    println!("session: {:?}", session_key);
                     // write session_key to file
                     fs::write("session_key", session_key.to_string());
                 },
@@ -79,3 +78,11 @@ fn create_session_key() {
         _ => panic!("create session key")
     }
 }
+
+fn sanitize_their_pub_key(response: &mut String) {
+    response.retain(|c| c != '\u{0}');
+}
+
+
+// * currently no concept of overflowing the server. stores data in
+// string, maybe leverage for stack overflow attack?
