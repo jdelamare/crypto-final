@@ -1,0 +1,7 @@
+[package]
+name = "simple2"
+version = "0.1.0"
+authors = ["Jeffrey De La Mare <feeltheluv53@gmail.com>"]
+
+[dependencies]
+rand = "0.5.4"
