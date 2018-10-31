@@ -17,18 +17,23 @@ fn main() {
 
 fn connect(mut stream: TcpStream) {
     // create a buffer for the response 
-    let mut response = String::new();
+    let mut response = [0;512];
+//    let mut response = String::new(); STRING
     // read the public key from file into request
     let request = fs::read_to_string("pub_key").unwrap();
+//    let request = fs::read_to_string("pub_key").unwrap(); STRING
     // send the request to the stream  
     // currently no concept of overflowing the server. stores data in
     // string, maybe leverage for stack overflow attack?
-    stream.write(request.as_bytes());
+    stream.write(request.as_bytes()).unwrap();
     // the stream carries the response back into response buffer
-    stream.read_to_string(&mut response);
-    println!("hello");
+    stream.read(&mut response);
+    //println!("{:?}", String::from_utf8_lossy(&response[..]));
+    let x = String::from_utf8_lossy(&response[..]).to_string();
+    println!("{}", x);
     // write the response to file. session key partially created
-    fs::write("session_key", response);
+    fs::write("session_key", x); //STRING
+    
 }
 
 fn create_pub_key() {
