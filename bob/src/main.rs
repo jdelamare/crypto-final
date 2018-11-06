@@ -17,7 +17,7 @@ fn main() {
 
 fn connect(mut stream: TcpStream) {
     // create a buffer for the response 
-    let mut response = [0;512];
+    let mut response = [0;1024];
     // read the public key from file into request
     let request = fs::read_to_string("pub_key").unwrap();
     // send the request to the stream  *
