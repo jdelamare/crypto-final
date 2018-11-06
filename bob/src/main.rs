@@ -32,11 +32,12 @@ fn connect(mut stream: TcpStream) {
 
 fn create_pub_key() {
     let g: u32 = 3;
-    let p: u32 = 7;
+    let p: u32 = 6;
     let a = fs::read_to_string("priv_key").unwrap();
     match a.parse::<u32>() {
         Ok(a) => {
             let pub_key = g.wrapping_pow(a) % p;
+            println!("pub_key: {:?}", pub_key);
             fs::write("pub_key", pub_key.to_string());
         },
         _ => panic!("create pub key")
@@ -46,7 +47,8 @@ fn create_pub_key() {
 fn create_priv_key() {
     let mut rng = rand::thread_rng();
     let priv_key: u32 = rng.gen();    
-    let priv_key = priv_key % 7;
+    println!("{:?}", priv_key);
+    let priv_key = priv_key % 23;
     fs::write("priv_key", priv_key.to_string());
 }
 
@@ -67,7 +69,7 @@ fn create_session_key() {
                     // my priv key is x, their pub key is y
                     println!("my priv: {:?}\ntheir pub {:?}", x, y);
 //                    let session_key = y.wrapping_pow(x) % 37;
-                    let session_key = y.pow(x) % 7;
+                    let session_key = y.pow(x) % 6;
                     println!("session: {:?}", session_key);
                     // write session_key to file
                     fs::write("session_key", session_key.to_string());

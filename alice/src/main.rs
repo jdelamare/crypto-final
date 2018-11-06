@@ -41,11 +41,12 @@ fn handle_connection(mut stream: TcpStream) {
 fn create_pub_key() {
     // Setting g = 2 results in pub_key = 0. wrapping_pow bug?
     let g: u32 = 3;  
-    let p: u32 = 7; // using this mod until big num is implemented
+    let p: u32 = 6; // using this mod until big num is implemented
     let a = fs::read_to_string("priv_key").unwrap();
     match a.parse::<u32>() {
         Ok(a) => {
             let pub_key = g.wrapping_pow(a) % p;
+            println!("pub_key: {:?}", pub_key);
             fs::write("pub_key", pub_key.to_string());
         },
         _ => panic!("create pub key")
@@ -55,7 +56,8 @@ fn create_pub_key() {
 fn create_priv_key() {
     let mut rng = rand::thread_rng();
     let priv_key: u32 = rng.gen();        
-    let priv_key =  priv_key % 7;
+    println!("{:?}",priv_key);
+    let priv_key =  priv_key % 23;
     fs::write("priv_key", priv_key.to_string());
 }
 
@@ -75,7 +77,7 @@ fn create_session_key() {
                     // my priv key is x, their pub key is y
                     println!("my priv: {:?}\ntheir pub {:?}", x, y); 
 //                    let session_key = y.wrapping_pow(x) % 7;
-                    let session_key = y.pow(x) % 7;
+                    let session_key = y.pow(x) % 6;
                     println!("session: {:?}", session_key);
                     // write session key to file
                     fs::write("session_key", session_key.to_string());
