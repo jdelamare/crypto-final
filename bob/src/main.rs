@@ -31,9 +31,30 @@ fn connect(mut stream: TcpStream) {
 }
 
 fn create_pub_key() {
-    let g: u32 = 3;
-    let p: u32 = 6;
+    // create the generator point
+    let g: Vec<u32> = vec![2;1]; // BigUint represents nums in radix 2^32
+    let g: BigUint = BigUint::new(g);
+    // define the modulus size
+    let p: BigUint = BigUint::from_bytes_le(
+            "ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024e088a67cc740\
+             20bbea63b139b22514a08798e3404ddef9519b3cd3a431b302b0a6df25f14374f\
+             e1356d6d51c245e485b576625e7ec6f44c42e9a637ed6b0bff5cb6f406b7edee3\
+             86bfb5a899fa5ae9f24117c4b1fe649286651ece45b3dc2007cb8a163bf0598da\
+             48361c55d39a69163fa8fd24cf5f83655d23dca3ad961c62f356208552bb9ed52\
+             9077096966d670c354e4abc9804f1746c08ca237327ffffffffffffffff"
+             .as_bytes());
+    // attempt to parse the private key file
     let a = fs::read_to_string("priv_key").unwrap();
+    match u32::from_str_radix(&a, 10) {
+        Ok(a) => {
+            let a: Vec<u32> = vec![a;1]; // BigUint represents nums in radix 2^32
+            let a: BigUint = BigUint::new(a);
+            let A = g.modpow(&a, &p);    // Create public key A
+            fs::write("pub_key", A.to_str_radix(10));
+        },
+        _ => panic!("create pub key")
+    }
+    /*
     match a.parse::<u32>() {
         Ok(a) => {
             let pub_key = g.wrapping_pow(a) % p;
@@ -41,15 +62,13 @@ fn create_pub_key() {
             fs::write("pub_key", pub_key.to_string());
         },
         _ => panic!("create pub key")
-    }
+    }*/
 }
 
 fn create_priv_key() {
     let mut rng = rand::thread_rng();
-    let priv_key: u32 = rng.gen();    
-    println!("{:?}", priv_key);
-    let priv_key = priv_key % 23;
-    fs::write("priv_key", priv_key.to_string());
+    let a: BigUint = rng.sample(RandomBits::new(32));
+    fs::write("priv_key", a.to_str_radix(10)); // TODO: Keep it all in 2^32?
 }
 
 fn create_session_key() {
