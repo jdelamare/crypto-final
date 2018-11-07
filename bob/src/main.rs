@@ -1,4 +1,4 @@
-#![feature(no_panic_pow)]
+//#![feature(no_panic_pow)]
 extern crate rand;
 
 use rand::Rng;
