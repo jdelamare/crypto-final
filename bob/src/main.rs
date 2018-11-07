@@ -14,32 +14,38 @@ fn main() {
     create_priv_key();
     create_pub_key();
     connect(stream);
-    // should check to see that the session key file has been created
     create_session_key();
 }
 
 fn connect(mut stream: TcpStream) {
     // create a buffer for the response 
     let mut response = [0;2048];
+
     // read the public key from file into request
     let request = fs::read_to_string("pub_key").unwrap();
+
     // send the request to the stream  *
     stream.write(request.as_bytes()).unwrap();
+
     // the stream carries the response back into response buffer
     stream.read(&mut response);
+
     // get their data from the response buffer, note we're using lossy
     let mut their_pub_key = String::from_utf8_lossy(&response[..]).to_string();
+
     // this function removes all of the excess padding characters
     sanitize_data_buffer(&mut their_pub_key);
+    
     // write the response to file. session key partially created
     // STRING CORRECTLY FORMATTED ON THEIR END
     fs::write("session_key", their_pub_key); 
 }
 
-fn create_pub_key() {
+fn create_pub_key() -> Result<(), &'static str> {
     // create the generator point
     let g: Vec<u32> = vec![2;1]; // BigUint represents nums in radix 2^32
     let g: BigUint = BigUint::new(g);
+
     // define the modulus size
     let p: BigUint = BigUint::from_bytes_le(
             "ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024e088a67cc740\
@@ -49,11 +55,15 @@ fn create_pub_key() {
              48361c55d39a69163fa8fd24cf5f83655d23dca3ad961c62f356208552bb9ed52\
              9077096966d670c354e4abc9804f1746c08ca237327ffffffffffffffff"
              .as_bytes());
-    let a = sanitize_big_num("priv_key");
-    println!("\nmy priv key\n{:?}",a);
-    let A = g.modpow(&a, &p);    // Create public key A
-    println!("\nmy pub key\n{:?}",A);
-    fs::write("pub_key", format!("{:?}",A));
+    match sanitize_big_num("priv_key") {
+        Ok(a)  => {
+            let A = g.modpow(&a, &p);
+            fs::write("pub_key", format!("{:?}", A));
+        },
+        Err(e) => return Err(e)
+    }
+
+    Ok(())
 }
 
 fn create_priv_key() {
@@ -62,7 +72,7 @@ fn create_priv_key() {
     fs::write("priv_key", format!("{:?}", a));
 }
 
-fn create_session_key() { 
+fn create_session_key() -> Result<(), &'static str> { 
     // need another copy of mod 
     let p: BigUint = BigUint::from_bytes_le(
             "ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024e088a67cc740\
@@ -75,24 +85,34 @@ fn create_session_key() {
 
     // note that session_key file contains other person's public key
     // take this client's public key from the file
-    let a = sanitize_big_num("priv_key");
-    let B = sanitize_big_num("session_key");
-    println!("\ntheir pub key\n{:?}",B);
-    let session_key = B.modpow(&a, &p);
-    println!("\nsession key\n{:?}",session_key);
-    fs::write("session_key", format!("{:?}", session_key));
-}
+    match sanitize_big_num("priv_key") {
+        Ok(a)  => {
+            match sanitize_big_num("session_key") {
+                Ok(B)  => {
+                    let session_key = B.modpow(&a, &p);
+                    fs::write("session_key", format!("{:?}", session_key));
+                },
+                Err(e) => return Err(e)
+            }
+        },
+        Err(e) => return Err(e)
+    }
 
+    Ok(())
+} 
 
 fn sanitize_data_buffer(response: &mut String) {
     response.retain(|c| c != '\u{0}');
 }
 
 
-//fn sanitize_big_num(filename: &str) -> Vec<u32> {
-fn sanitize_big_num(filename: &str) -> BigUint { //TODO: return a result
+fn sanitize_big_num(filename: &str) -> Result <BigUint, &'static str> { //TODO: return a result
     // takes in a file handle
-    let mut raw_data = fs::read_to_string(filename).unwrap(); //TODO: Are we guaranteed a file?
+    let mut raw_data = String::new();
+    match fs::read_to_string(filename) {
+        Ok(x) => raw_data = x,
+        _     => return Err("missing file")
+    }
     // strips the contents that are not 0-9 or whitespace
     raw_data.retain(|c| c == ' ' ||
                         c == '0' ||
@@ -111,11 +131,12 @@ fn sanitize_big_num(filename: &str) -> BigUint { //TODO: return a result
     for chunk in split_data {
         match chunk.parse::<u32>() {
             Ok(x) => parsed_data.push(x),
-            _ => panic!("sanitizing big num")
+            _ => return Err("sanitizing big num")
         }
     }
 
+    // create the desired bignum from the vector
     let bignum = BigUint::new(parsed_data);
 
-    bignum
+    Ok(bignum)
 }
