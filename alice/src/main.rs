@@ -62,7 +62,8 @@ fn create_pub_key() {
             let a: Vec<u32> = vec![a;1]; // BigUint represents nums in radix 2^32
             let a: BigUint = BigUint::new(a);
             let A = g.modpow(&a, &p);    // Create public key A
-            fs::write("pub_key", A.to_str_radix(10));
+// CHANGE           fs::write("pub_key", A.to_str_radix(10));
+            fs::write("pub_key", format!("{:?}", A));
         },
         _ => panic!("create pub key")
     }
