@@ -20,7 +20,7 @@ fn main() {
 
 fn connect(mut stream: TcpStream) {
     // create a buffer for the response 
-    let mut response = [0;1024];
+    let mut response = [0;2048];
     // read the public key from file into request
     let request = fs::read_to_string("pub_key").unwrap();
     // send the request to the stream  *
@@ -50,7 +50,9 @@ fn create_pub_key() {
              9077096966d670c354e4abc9804f1746c08ca237327ffffffffffffffff"
              .as_bytes());
     let a = sanitize_big_num("priv_key");
+    println!("\nmy priv key\n{:?}",a);
     let A = g.modpow(&a, &p);    // Create public key A
+    println!("\nmy pub key\n{:?}",A);
     fs::write("pub_key", format!("{:?}",A));
 }
 
@@ -75,7 +77,9 @@ fn create_session_key() {
     // take this client's public key from the file
     let a = sanitize_big_num("priv_key");
     let B = sanitize_big_num("session_key");
+    println!("\ntheir pub key\n{:?}",B);
     let session_key = B.modpow(&a, &p);
+    println!("\nsession key\n{:?}",session_key);
     fs::write("session_key", format!("{:?}", session_key));
 }
 
