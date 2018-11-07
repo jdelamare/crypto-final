@@ -1,7 +1,9 @@
 [package]
 name = "simple"
 version = "0.1.0"
-authors = ["Jeffrey De La Mare <feeltheluv53@gmail.com>"]
+authors = ["Jeffrey De La Mare <dejef@pdx.edu>"]
 
 [dependencies]
+num-bigint = { version = "0.2.0", features = ["rand"] }
+num-traits = "0.2.6"
 rand = "0.5.4"
