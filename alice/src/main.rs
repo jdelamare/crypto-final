@@ -100,7 +100,7 @@ fn create_session_key() {
             // take their public key B from the session file
             let B = fs::read_to_string("session_key").unwrap();
             println!("{:?}", B);
-            panic!();
+            //panic!();
             match u32::from_str_radix(&B, 10) {
                 Ok(B) => {
                     println!("my priv: {:?}\ntheir pub {:?}", a, B);
@@ -118,4 +118,8 @@ fn create_session_key() {
 
 fn sanitize_their_pub_key(response: &mut String) {
     response.retain(|c| c != '\u{0}');
+}
+
+fn sanitize_big_num(filename: &str) -> BigUint {
+
 }

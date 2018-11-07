@@ -33,7 +33,8 @@ fn connect(mut stream: TcpStream) {
     // this function removes all of the excess padding characters
     sanitize_data_buffer(&mut their_pub_key);
     // write the response to file. session key partially created
-    fs::write("session_key", their_pub_key); //STRING
+    // STRING CORRECTLY FORMATTED ON THEIR END
+    fs::write("session_key", their_pub_key); 
 }
 
 fn create_pub_key() {
@@ -49,30 +50,6 @@ fn create_pub_key() {
              48361c55d39a69163fa8fd24cf5f83655d23dca3ad961c62f356208552bb9ed52\
              9077096966d670c354e4abc9804f1746c08ca237327ffffffffffffffff"
              .as_bytes());
-    // attempt to parse the private key file
-    /* // base 10 stuff 
-    let a = fs::read_to_string("priv_key").unwrap();
-    match u32::from_str_radix(&a, 10) {
-        Ok(a) => {
-            let a: Vec<u32> = vec![a;1]; // BigUint represents nums in radix 2^32
-            let a: BigUint = BigUint::new(a);
-            let A = g.modpow(&a, &p);    // Create public key A
-            fs::write("pub_key", format!("{:?}",A));
-            //sanitize_big_num("pub_key");
-            //panic!();
-        },
-        _ => panic!("create pub key")
-    }
-    */ 
-    /* slightly newer
-    let a = fs::read_to_string("priv_key").unwrap();
-    match a.parse::<BigUint>() {
-        Ok(a) => {
-            let A = g.modpow(&a, &p);
-            fs::write("pub_key", format!("{:?}", A));
-        },
-        _ => panic!("create pub key")
-    }*/
     let a = sanitize_big_num("priv_key");
     let A = g.modpow(&a, &p);    // Create public key A
     fs::write("pub_key", format!("{:?}",A));
@@ -81,7 +58,6 @@ fn create_pub_key() {
 fn create_priv_key() {
     let mut rng = rand::thread_rng();
     let a: BigUint = rng.sample(RandomBits::new(32));
-    //fs::write("priv_key", a.to_str_radix(10)); // TODO: Keep it all in 2^32?
     fs::write("priv_key", format!("{:?}", a));
 }
 
@@ -98,72 +74,17 @@ fn create_session_key() {
 
     // note that session_key file contains other person's public key
     // take this client's public key from the file
-//    let a = fs::read_to_string("priv_key").unwrap();
     let a = sanitize_big_num("priv_key");
     let B = sanitize_big_num("session_key");
     let session_key = B.modpow(&a, &p);
     fs::write("session_key", format!("{:?}", session_key));
-
-    // from string biguint parse
-    /*
-    match a.parse::<BigUint>() {
-        Ok(a) => {
-            let B = fs::read_to_string("session_key").unwrap();
-            match B.parse::<BigUint>() {
-                Ok(B) => {
-                    let session_key = B.modpow(&a,&p);
-                    fs::write("session_key", format!("{:?}", session_key));
-                },
-                _ => println!("probably not ok")
-            }
-        },
-        _ => panic!("create session key")
-    }*/ 
-
-
-    // from string radix 10
-    /* attempt to parse my private key
-    match u32::from_str_radix(&a, 10) {
-        Ok(a) => {
-            // represent my private key as a bignum
-            let a: Vec<u32> = vec![a;1]; // BigUint represents nums in radix 2^32
-            let a: BigUint = BigUint::new(a);
-            println!("{:?}", a);
-            // take their public key B from the session file
-            let B = fs::read_to_string("session_key").unwrap();
-            match B.parse::<BigUint>() {
-                Ok(x) => {
-                    let session_key = B.modpow(&a,&p);
-                    fs::write("session_key", format!("{:?}", session_key));
-                },
-                _ => println!("probably not ok")
-            }
-            println!("old: {:?}", B);
-            panic!();
-            let B0 = sanitize_big_num("session_key");
-            println!("new: {:?}", B);
-            match u32::from_str_radix(&B, 10) {
-                Ok(B) => {
-                    println!("my priv: {:?}\ntheir pub {:?}", a, B);
-                    let B: Vec<u32> = vec![B;1];
-                    let B: BigUint = BigUint::new(B);
-                    let session_key = B.modpow(&a, &p);
-                    fs::write("session_key", session_key.to_str_radix(10));
-                },
-                _ => panic!("create session key")
-            }
-        },
-        _ => panic!("create session key")
-    }*/
 }
+
 
 fn sanitize_data_buffer(response: &mut String) {
     response.retain(|c| c != '\u{0}');
 }
 
-
-// * currently no concept of overflowing the server. stores data in
-// string, maybe leverage for stack overflow attack?
 
 //fn sanitize_big_num(filename: &str) -> Vec<u32> {
 fn sanitize_big_num(filename: &str) -> BigUint { //TODO: return a result
@@ -186,8 +107,8 @@ fn sanitize_big_num(filename: &str) -> BigUint { //TODO: return a result
     let mut parsed_data: Vec<u32> = vec![];
     for chunk in split_data {
         match chunk.parse::<u32>() {
-            Ok(x) => println!("{:?}",x),//parsed_data.push(x),
-            _ => panic!("bad")
+            Ok(x) => parsed_data.push(x),
+            _ => panic!("sanitizing big num")
         }
     }
 
