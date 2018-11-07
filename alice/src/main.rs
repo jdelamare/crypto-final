@@ -98,10 +98,13 @@ fn create_session_key() {
             
             // take their public key B from the session file
             let B = fs::read_to_string("session_key").unwrap();
-
-            match u32::from_str_radix(&a, 10) {
+            println!("{:?}", B);
+            panic!();
+            match u32::from_str_radix(&B, 10) {
                 Ok(B) => {
                     println!("my priv: {:?}\ntheir pub {:?}", a, B);
+                    let B: Vec<u32> = vec![B;1];
+                    let B: BigUint = BigUint::new(B);
                     let session_key = B.modpow(&a, &p);
                     fs::write("session_key", session_key.to_str_radix(10));
                 },
