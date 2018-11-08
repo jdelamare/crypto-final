@@ -23,7 +23,9 @@ fn main() {
     }
 }
 
-
+/// # Handling web request
+/// Deals with the tcp stream that is being passed to this function. The 
+/// stream is permitted to be a length of 2048 bytes or less.
 fn handle_connection(mut stream: TcpStream) {
     // create a buffer for the request 
     let mut request = [0;2048];
@@ -160,11 +162,31 @@ fn create_session_key() -> Result<(), &'static str> {
     Ok(())
 }
 
+/// # Sanitize their public key
+/// Given a public key over the wire, strip all of the padding characters
+/// from the string. The reason this function is necessary is due to the
+/// lack of concurrency? when working with a buffer represented by a String
+/// instead of an array. As it stands, requests and responses overwrite data
+/// in the array, instead of into a String object. Thus manually removeing
+/// '\u{0}' is required.
+/// ## Example
+/// ```
+/// unimplemented!();
+/// ```
 fn sanitize_their_pub_key(response: &mut String) {
     response.retain(|c| c != '\u{0}');
 }
 
 
+/// # Sanitize a big num from file
+/// The keys are stored as files in the working directory. However, they're
+/// not stored as base 10 numbers, rather their big num representation is in 
+/// 2^32. So this file is stripped of its excess characters, and piped into 
+/// a BigUint appropriately.
+/// ## Example
+/// ```
+/// unimplemented!()
+/// ```
 fn sanitize_big_num(filename: &str) -> Result <BigUint, &'static str> { 
     // takes in a filename and reads the contents of the file to a string
     let mut raw_data = String::new();
