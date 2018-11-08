@@ -5,6 +5,8 @@ extern crate rand;
 use num_bigint::{BigUint, RandomBits};
 use num_traits::{Zero, One};
 use rand::Rng;
+use std::error;
+use std::fmt;
 use std::fs;
 use std::io::prelude::*;
 use std::net::TcpStream;
@@ -234,3 +236,22 @@ fn sanitize_big_num(filename: &str) -> Result <BigUint, &'static str> { //TODO: 
 
     Ok(bignum)
 }
+
+
+// Attempting implement custom error
+#[derive(Debug)]
+struct ErrorChain;
+
+impl fmt::Display for ErrorChain {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "print your error msg here")
+    }
+}
+
+impl error::Error for ErrorChain {
+    fn source(&self) -> Option<&(dyn: Error + 'static) {
+        None
+    }
+}
+
+// Need to impl From so these errors can be used with `?`
