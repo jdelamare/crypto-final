@@ -3,7 +3,6 @@ extern crate num_traits;
 extern crate rand;
 
 use num_bigint::{BigUint, RandomBits};
-use num_traits::{Zero, One};
 use rand::Rng;
 use std::fs;
 use std::io::prelude::*;
@@ -25,7 +24,15 @@ fn main() {
 
 /// # Handling web request
 /// Deals with the tcp stream that is being passed to this function. The 
-/// stream is permitted to be a length of 2048 bytes or less.
+/// stream is permitted to be a length of 2048 bytes or less. The public
+/// key of the other user is read from the stream and my public key is 
+/// returned as a response. Their public key is then sanitized and 
+/// stored temporarily in the session_key file. Then the actual session 
+/// key is generated.
+/// ## Example
+/// ```
+/// unimplemented!();
+/// ```
 fn handle_connection(mut stream: TcpStream) {
     // create a buffer for the request 
     let mut request = [0;2048];
@@ -43,7 +50,7 @@ fn handle_connection(mut stream: TcpStream) {
     let mut their_pub_key = String::from_utf8_lossy(&request[..]).to_string();
     
     // the string contains a lot of \u{0}, remove them.
-    sanitize_their_pub_key(&mut their_pub_key);
+    sanitize_data_buffer(&mut their_pub_key);
 
     // their sanitized public key is temporarily held in the session_key file 
     fs::write("session_key", their_pub_key);
@@ -173,7 +180,7 @@ fn create_session_key() -> Result<(), &'static str> {
 /// ```
 /// unimplemented!();
 /// ```
-fn sanitize_their_pub_key(response: &mut String) {
+fn sanitize_data_buffer(response: &mut String) {
     response.retain(|c| c != '\u{0}');
 }
 

@@ -9,6 +9,7 @@ use std::fs;
 use std::io::prelude::*;
 use std::net::TcpStream;
 
+
 fn main() {
     let mut stream = TcpStream::connect("127.0.0.1:7878").unwrap();
     create_priv_key();
@@ -17,6 +18,18 @@ fn main() {
     create_session_key();
 }
 
+
+/// # Create and dispatch web request
+/// This creates a web request and sends it off to the port specified
+/// by the caller. The stream is permitted to be a length of 2048
+/// bytes or less. My public key is sent as a request and the other
+/// user's public key is received as a response. Their public key is
+/// expected to be correctly formatted, and it is stored in the session_key
+/// file. Then the actual session key is generated.
+/// # Example
+/// ```
+/// unimplemented!();
+/// ```
 fn connect(mut stream: TcpStream) {
     // create a buffer for the response 
     let mut response = [0;2048];
@@ -41,6 +54,25 @@ fn connect(mut stream: TcpStream) {
     fs::write("session_key", their_pub_key); 
 }
 
+
+/// # Create a public key
+/// Create a file in the working directory that contains the big num
+/// representation of this user's public key. The function takes no
+/// arguments, and returns the unit type upon success. If there is
+/// an error sanitizing the input, it is propogated upwards.
+/// ## Example
+/// ```
+/// use std::fs;
+///
+///fn main() -> std::io::Result<()> {
+///     match create_pub_key() {
+///         Ok(()) => (), // the file pub_key has been created
+///         _ => panic!("Error generating public key")
+///     }
+///     let path = fs::canonicalize("priv_key")?;
+///     Ok(())
+/// }
+/// ```
 fn create_pub_key() -> Result<(), &'static str> {
     // create the generator point
     let g: Vec<u32> = vec![2;1]; // BigUint represents nums in radix 2^32
@@ -55,6 +87,13 @@ fn create_pub_key() -> Result<(), &'static str> {
              48361c55d39a69163fa8fd24cf5f83655d23dca3ad961c62f356208552bb9ed52\
              9077096966d670c354e4abc9804f1746c08ca237327ffffffffffffffff"
              .as_bytes());
+
+    // I'll roll my own errors one day
+    // https://stackoverflow.com/questions/42584368/how-do-you-define-custom-error-types-in-rust
+//    let priv_key = sanitize_big_num("priv_key")?;
+//    let pub_key = g.modpow(&priv_key, &p);
+//    fs::write("pub_key", format!("{:?}", pub_key))?;
+
     match sanitize_big_num("priv_key") {
         Ok(a)  => {
             let A = g.modpow(&a, &p);
@@ -66,12 +105,46 @@ fn create_pub_key() -> Result<(), &'static str> {
     Ok(())
 }
 
+
+/// # Create a private key
+/// Create a file in the working directory that contains the big num
+/// representation of the this user's private key. The function takes
+/// no arguments and should not fail provided these library calls are stable.
+/// ## Example
+/// ```
+/// use std::fs;
+///
+/// fn main() -> std::io::Result<()> {
+///     create_priv_key();
+///     let path = fs::canonicalize("priv_key")?;
+///     Ok(())
+/// }
+/// ```
+fn create_priv_key() {
+    let mut rng = rand::thread_rng();
+    let a: BigUint = rng.sample(RandomBits::new(32));
+    fs::write("priv_key", format!("{:?}", a));
+}
 fn create_priv_key() {
     let mut rng = rand::thread_rng();
     let a: BigUint = rng.sample(RandomBits::new(32));
     fs::write("priv_key", format!("{:?}", a));
 }
 
+
+/// # Create a session key
+/// Create a file in the working directory that contains the big num
+/// representation of the these user's session key.
+/// ## Example
+/// ```
+/// use std::fs;
+///
+/// fn main() -> std::io::Result<()> {
+///     create_priv_key();
+///     let path = fs::canonicalize("priv_key")?;
+///     Ok(())
+/// }
+/// ```
 fn create_session_key() -> Result<(), &'static str> { 
     // need another copy of mod 
     let p: BigUint = BigUint::from_bytes_le(
@@ -101,11 +174,32 @@ fn create_session_key() -> Result<(), &'static str> {
     Ok(())
 } 
 
+
+/// # Sanitize their public key
+/// Given a public key over the wire, strip all of the padding characters
+/// from the string. The reason this function is necessary is due to the
+/// lack of concurrency? when working with a buffer represented by a String
+/// instead of an array. As it stands, requests and responses overwrite data
+/// in the array, instead of into a String object. Thus manually removeing
+/// '\u{0}' is required.
+/// ## Example
+/// ```
+/// unimplemented!();
+/// ```
 fn sanitize_data_buffer(response: &mut String) {
     response.retain(|c| c != '\u{0}');
 }
 
 
+/// # Sanitize a big num from file
+/// The keys are stored as files in the working directory. However, they're
+/// not stored as base 10 numbers, rather their big num representation is in
+/// 2^32. So this file is stripped of its excess characters, and piped into
+/// a BigUint appropriately.
+/// ## Example
+/// ```
+/// unimplemented!()
+/// ```
 fn sanitize_big_num(filename: &str) -> Result <BigUint, &'static str> { //TODO: return a result
     // takes in a file handle
     let mut raw_data = String::new();
