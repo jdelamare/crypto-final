@@ -1,52 +1,97 @@
-#![feature(no_panic_pow)]
 extern crate num_bigint;
 extern crate num_traits;
 extern crate rand;
 
 use num_bigint::{BigUint, RandomBits};
-use num_traits::{Zero, One};
 use rand::Rng;
+use std::fmt;
 use std::fs;
+use std::num;
+use std::io::{self, Read};
 use std::io::prelude::*;
 use std::net::TcpStream;
 use std::net::TcpListener;
 
-fn main() {
-    let listener = TcpListener::bind("127.0.0.1:7878").expect("bind error");
-    create_priv_key();
-    create_pub_key();
+
+fn main() -> Result<(), CliError> {
+    let listener = TcpListener::bind("127.0.0.1:7878")?;
+    create_priv_key()?;
+    create_pub_key()?;
 
     for stream in listener.incoming() {
-        let stream = stream.expect("stream error");
+        //let stream = stream.expect("stream error");
 
-        handle_connection(stream);
+        handle_connection(stream?)?;
+        break;
     }
+
+    Ok(())
 }
 
-fn handle_connection(mut stream: TcpStream) {
+/// # Handling web request
+/// Deals with the tcp stream that is being passed to this function. The 
+/// stream is permitted to be a length of 2048 bytes or less. The public
+/// key of the other user is read from the stream and my public key is 
+/// returned as a response. Their public key is then sanitized and 
+/// stored temporarily in the session_key file. Then the actual session 
+/// key is generated.
+/// ## Example
+/// ```
+/// unimplemented!();
+/// ```
+fn handle_connection(mut stream: TcpStream) -> Result<(), CliError> {
     // create a buffer for the request 
-    let mut request = [0;1024];
+    let mut request = [0;2048];
+
     // read the request from the stream (their public key)
-    stream.read(&mut request).unwrap();
+    stream.read(&mut request)?;
+
     // read in the public key for this server (my public key)
-    let response = fs::read_to_string("pub_key").unwrap();
+    let response = fs::read_to_string("pub_key")?;
+    
     // respond to the request with my public key
-    stream.write(response.as_bytes()).unwrap();
+    stream.write(response.as_bytes())?;
+
     // now deal with their request by moving it from buffer to string
     let mut their_pub_key = String::from_utf8_lossy(&request[..]).to_string();
+    
     // the string contains a lot of \u{0}, remove them.
-    sanitize_their_pub_key(&mut their_pub_key);
+    sanitize_data_buffer(&mut their_pub_key);
+
     // their sanitized public key is temporarily held in the session_key file 
-    fs::write("session_key", their_pub_key);
+    fs::write("session_key", their_pub_key)?;
+
     // generate the session key with the gathered information
-    create_session_key();
+    create_session_key()?;
+
+    Ok(())
 }
 
-fn create_pub_key() {
-    // create the generator point
+
+/// # Create a public key
+/// Create a file in the working directory that contains the big num
+/// representation of this user's public key. The function takes no
+/// arguments, and returns the unit type upon success. If there is 
+/// an error sanitizing the input, it is propogated upwards.
+/// ## Example
+/// ```
+/// use std::fs;
+///
+///fn main() -> std::io::Result<()> {
+///     match create_pub_key() {
+///         Ok(()) => (), // the file pub_key has been created  
+///         _ => panic!("Error generating public key")
+///     }
+///     let path = fs::canonicalize("priv_key")?;
+///     Ok(())
+/// }    
+/// ```
+fn create_pub_key() -> Result<(), CliError> {
+    // create the base point (must be primitive root modulo p)
     let g: Vec<u32> = vec![2;1]; // BigUint represents nums in radix 2^32
     let g: BigUint = BigUint::new(g);
-    // define the modulus size
+
+    // define the modulus size p
     let p: BigUint = BigUint::from_bytes_le(
             "ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024e088a67cc740\
              20bbea63b139b22514a08798e3404ddef9519b3cd3a431b302b0a6df25f14374f\
@@ -55,26 +100,53 @@ fn create_pub_key() {
              48361c55d39a69163fa8fd24cf5f83655d23dca3ad961c62f356208552bb9ed52\
              9077096966d670c354e4abc9804f1746c08ca237327ffffffffffffffff"
              .as_bytes());
-    // attempt to parse the private key file
-    let a = fs::read_to_string("priv_key").unwrap();
-    match u32::from_str_radix(&a, 10) {
-        Ok(a) => {  
-            let a: Vec<u32> = vec![a;1]; // BigUint represents nums in radix 2^32
-            let a: BigUint = BigUint::new(a);
-            let A = g.modpow(&a, &p);    // Create public key A
-            fs::write("pub_key", A.to_str_radix(10));
-        },
-        _ => panic!("create pub key")
-    }
+
+    // take the previously generated private key and craft pub key from it
+    let priv_key = sanitize_big_num("priv_key")?;
+    let pub_key = g.modpow(&priv_key, &p);
+    fs::write("pub_key", format!("{:?}", pub_key))?;
+
+    Ok(())
 }
 
-fn create_priv_key() {
+
+/// # Create a private key
+/// Create a file in the working directory that contains the big num
+/// representation of the this user's private key. The function takes
+/// no arguments and should not fail provided these library calls are stable.
+/// ## Example
+/// ```
+/// use std::fs;
+///
+/// fn main() -> std::io::Result<()> {
+///     create_priv_key();
+///     let path = fs::canonicalize("priv_key")?;
+///     Ok(())
+/// }
+/// ```
+fn create_priv_key() -> Result<(), CliError> {
     let mut rng = rand::thread_rng();
     let a: BigUint = rng.sample(RandomBits::new(32));
-    fs::write("priv_key", a.to_str_radix(10)); // TODO: Keep it all in 2^32?
+    fs::write("priv_key", format!("{:?}", a))?; 
+
+    Ok(())
 }
 
-fn create_session_key() { 
+
+/// # Create a session key
+/// Create a file in the working directory that contains the big num
+/// representation of the these user's session key.
+/// ## Example
+/// ```
+/// use std::fs;
+///
+/// fn main() -> std::io::Result<()> {
+///     create_priv_key();
+///     let path = fs::canonicalize("priv_key")?;
+///     Ok(())
+/// }
+/// ```
+fn create_session_key() -> Result<(), CliError> { 
     // need another copy of mod 
     let p: BigUint = BigUint::from_bytes_le(
             "ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024e088a67cc740\
@@ -87,31 +159,92 @@ fn create_session_key() {
 
     // note that session_key file contains other person's public key
     // take this client's public key from the file
-    let a = fs::read_to_string("priv_key").unwrap();
+    let priv_key = sanitize_big_num("priv_key")?;
+    let pub_key = sanitize_big_num("session_key")?;
+    let session_key = pub_key.modpow(&priv_key, &p);
+    fs::write("session_key", format!("{:?}", session_key))?;
 
-    // attempt to parse my private key
-    match u32::from_str_radix(&a, 10) {
-        Ok(a) => {
-            // represent my private key as a bignum
-            let a: Vec<u32> = vec![a;1]; // BigUint represents nums in radix 2^32
-            let a: BigUint = BigUint::new(a);
-            
-            // take their public key B from the session file
-            let B = fs::read_to_string("session_key").unwrap();
+    Ok(())
+}
 
-            match u32::from_str_radix(&a, 10) {
-                Ok(B) => {
-                    println!("my priv: {:?}\ntheir pub {:?}", a, B);
-                    let session_key = B.modpow(&a, &p);
-                    fs::write("session_key", session_key.to_str_radix(10));
-                },
-                _ => panic!("create session key")
-            }
-        },
-        _ => panic!("create session key")
+/// # Sanitize their public key
+/// Given a public key over the wire, strip all of the padding characters
+/// from the string. The reason this function is necessary is due to the
+/// lack of concurrency? when working with a buffer represented by a String
+/// instead of an array. As it stands, requests and responses overwrite data
+/// in the array, instead of into a String object. Thus manually removeing
+/// '\u{0}' is required.
+/// ## Example
+/// ```
+/// unimplemented!();
+/// ```
+fn sanitize_data_buffer(response: &mut String) {
+    response.retain(|c| c != '\u{0}');
+}
+
+
+/// # Sanitize a big num from file
+/// The keys are stored as files in the working directory. However, they're
+/// not stored as base 10 numbers, rather their big num representation is in 
+/// 2^32. So this file is stripped of its excess characters, and piped into 
+/// a BigUint appropriately.
+/// ## Example
+/// ```
+/// unimplemented!()
+/// ```
+fn sanitize_big_num(filename: &str) -> Result <BigUint, CliError> { 
+    // takes in a filename and reads the contents of the file to a string
+    let mut raw_data = fs::read_to_string(filename)?;
+    
+    // strips the contents that are not 0-9 or whitespace
+    raw_data.retain(|c| c == ' ' || c == '0' || c == '1' ||
+                        c == '2' || c == '3' || c == '4' ||
+                        c == '5' || c == '6' || c == '7' ||
+                        c == '8' || c == '9');
+
+    // take each of those chunks and plop it in an element of Vec<u32>
+    let split_data = raw_data.split_whitespace();
+
+    // prepare a data structure to store the parsed data
+    let mut parsed_data: Vec<u32> = vec![];
+
+    // split the chunks and error out if unsuccessful
+    for chunk in split_data {
+        parsed_data.push(chunk.parse::<u32>()?);
+    }
+    
+    // create the desired bignum from the vector
+    let bignum = BigUint::new(parsed_data);
+
+    Ok(bignum)
+}
+
+
+// Code taken from here.
+// https://doc.rust-lang.org/std/convert/trait.From.html
+// Inspiration from here and Rust-By-Example
+// https://stackoverflow.com/questions/42584368/how-do-you-define-custom-error-types-in-rust
+#[derive(Debug)]
+enum CliError {
+    IoError(io::Error),
+    ParseError(num::ParseIntError)
+}
+
+impl fmt::Display for CliError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "print your error msg here")
     }
 }
 
-fn sanitize_their_pub_key(response: &mut String) {
-    response.retain(|c| c != '\u{0}');
+// Need to impl From so these errors can be used with `?`
+impl From<io::Error> for CliError {
+    fn from(error: io::Error) -> Self {
+        CliError::IoError(error)
+    }
+}
+
+impl From<num::ParseIntError> for CliError {
+    fn from(error: num::ParseIntError) -> Self {
+        CliError::ParseError(error)
+    }
 }
