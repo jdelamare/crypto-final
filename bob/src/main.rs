@@ -5,7 +5,7 @@ extern crate rand;
 use num_bigint::{BigUint, RandomBits};
 use num_traits::{Zero, One};
 use rand::Rng;
-use std::error;
+use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::io::prelude::*;
@@ -90,12 +90,6 @@ fn create_pub_key() -> Result<(), &'static str> {
              9077096966d670c354e4abc9804f1746c08ca237327ffffffffffffffff"
              .as_bytes());
 
-    // I'll roll my own errors one day
-    // https://stackoverflow.com/questions/42584368/how-do-you-define-custom-error-types-in-rust
-//    let priv_key = sanitize_big_num("priv_key")?;
-//    let pub_key = g.modpow(&priv_key, &p);
-//    fs::write("pub_key", format!("{:?}", pub_key))?;
-
     match sanitize_big_num("priv_key") {
         Ok(a)  => {
             let A = g.modpow(&a, &p);
@@ -122,11 +116,6 @@ fn create_pub_key() -> Result<(), &'static str> {
 ///     Ok(())
 /// }
 /// ```
-fn create_priv_key() {
-    let mut rng = rand::thread_rng();
-    let a: BigUint = rng.sample(RandomBits::new(32));
-    fs::write("priv_key", format!("{:?}", a));
-}
 fn create_priv_key() {
     let mut rng = rand::thread_rng();
     let a: BigUint = rng.sample(RandomBits::new(32));
@@ -202,7 +191,7 @@ fn sanitize_data_buffer(response: &mut String) {
 /// ```
 /// unimplemented!()
 /// ```
-fn sanitize_big_num(filename: &str) -> Result <BigUint, &'static str> { //TODO: return a result
+fn sanitize_big_num(filename: &str) -> Result <BigUint, &'static str> { 
     // takes in a file handle
     let mut raw_data = String::new();
     match fs::read_to_string(filename) {
@@ -236,22 +225,3 @@ fn sanitize_big_num(filename: &str) -> Result <BigUint, &'static str> { //TODO: 
 
     Ok(bignum)
 }
-
-
-// Attempting implement custom error
-#[derive(Debug)]
-struct ErrorChain;
-
-impl fmt::Display for ErrorChain {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "print your error msg here")
-    }
-}
-
-impl error::Error for ErrorChain {
-    fn source(&self) -> Option<&(dyn: Error + 'static) {
-        None
-    }
-}
-
-// Need to impl From so these errors can be used with `?`
