@@ -3,21 +3,23 @@ extern crate num_traits;
 extern crate rand;
 
 use num_bigint::{BigUint, RandomBits};
-use num_traits::{Zero, One};
 use rand::Rng;
-use std::error::Error;
 use std::fmt;
+use std::num;
 use std::fs;
+use std::io::{self, Read};
 use std::io::prelude::*;
 use std::net::TcpStream;
 
 
-fn main() {
-    let mut stream = TcpStream::connect("127.0.0.1:7878").unwrap();
-    create_priv_key();
-    create_pub_key();
-    connect(stream);
-    create_session_key();
+fn main() -> Result<(), CliError> {
+    let stream = TcpStream::connect("127.0.0.1:7878")?;
+    create_priv_key()?;
+    create_pub_key()?;
+    connect(stream)?;
+    create_session_key()?;
+
+    Ok(())
 }
 
 
@@ -32,18 +34,17 @@ fn main() {
 /// ```
 /// unimplemented!();
 /// ```
-fn connect(mut stream: TcpStream) {
-    // create a buffer for the response 
+fn connect(mut stream: TcpStream) -> Result<(), CliError> {
     let mut response = [0;2048];
 
     // read the public key from file into request
-    let request = fs::read_to_string("pub_key").unwrap();
+    let request = fs::read_to_string("pub_key")?;
 
     // send the request to the stream  *
-    stream.write(request.as_bytes()).unwrap();
+    stream.write(request.as_bytes())?;
 
     // the stream carries the response back into response buffer
-    stream.read(&mut response);
+    stream.read(&mut response)?;
 
     // get their data from the response buffer, note we're using lossy
     let mut their_pub_key = String::from_utf8_lossy(&response[..]).to_string();
@@ -53,7 +54,9 @@ fn connect(mut stream: TcpStream) {
     
     // write the response to file. session key partially created
     // STRING CORRECTLY FORMATTED ON THEIR END
-    fs::write("session_key", their_pub_key); 
+    fs::write("session_key", their_pub_key)?; 
+
+    Ok(())
 }
 
 
@@ -75,7 +78,7 @@ fn connect(mut stream: TcpStream) {
 ///     Ok(())
 /// }
 /// ```
-fn create_pub_key() -> Result<(), &'static str> {
+fn create_pub_key() -> Result<(), CliError> {
     // create the generator point
     let g: Vec<u32> = vec![2;1]; // BigUint represents nums in radix 2^32
     let g: BigUint = BigUint::new(g);
@@ -90,13 +93,9 @@ fn create_pub_key() -> Result<(), &'static str> {
              9077096966d670c354e4abc9804f1746c08ca237327ffffffffffffffff"
              .as_bytes());
 
-    match sanitize_big_num("priv_key") {
-        Ok(a)  => {
-            let A = g.modpow(&a, &p);
-            fs::write("pub_key", format!("{:?}", A));
-        },
-        Err(e) => return Err(e)
-    }
+    let priv_key = sanitize_big_num("priv_key")?;
+    let pub_key = g.modpow(&priv_key, &p);
+    fs::write("pub_key", format!("{:?}", pub_key))?;
 
     Ok(())
 }
@@ -116,10 +115,12 @@ fn create_pub_key() -> Result<(), &'static str> {
 ///     Ok(())
 /// }
 /// ```
-fn create_priv_key() {
+fn create_priv_key() -> Result<(), CliError> {
     let mut rng = rand::thread_rng();
     let a: BigUint = rng.sample(RandomBits::new(32));
-    fs::write("priv_key", format!("{:?}", a));
+    fs::write("priv_key", format!("{:?}", a))?;
+
+    Ok(())
 }
 
 
@@ -136,7 +137,7 @@ fn create_priv_key() {
 ///     Ok(())
 /// }
 /// ```
-fn create_session_key() -> Result<(), &'static str> { 
+fn create_session_key() -> Result<(), CliError> { 
     // need another copy of mod 
     let p: BigUint = BigUint::from_bytes_le(
             "ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024e088a67cc740\
@@ -149,18 +150,10 @@ fn create_session_key() -> Result<(), &'static str> {
 
     // note that session_key file contains other person's public key
     // take this client's public key from the file
-    match sanitize_big_num("priv_key") {
-        Ok(a)  => {
-            match sanitize_big_num("session_key") {
-                Ok(B)  => {
-                    let session_key = B.modpow(&a, &p);
-                    fs::write("session_key", format!("{:?}", session_key));
-                },
-                Err(e) => return Err(e)
-            }
-        },
-        Err(e) => return Err(e)
-    }
+    let priv_key = sanitize_big_num("priv_key")?;
+    let pub_key = sanitize_big_num("session_key")?;
+    let session_key = pub_key.modpow(&priv_key, &p);
+    fs::write("session_key", format!("{:?}", session_key))?;
 
     Ok(())
 } 
@@ -191,37 +184,54 @@ fn sanitize_data_buffer(response: &mut String) {
 /// ```
 /// unimplemented!()
 /// ```
-fn sanitize_big_num(filename: &str) -> Result <BigUint, &'static str> { 
+fn sanitize_big_num(filename: &str) -> Result <BigUint, CliError> { 
     // takes in a file handle
-    let mut raw_data = String::new();
-    match fs::read_to_string(filename) {
-        Ok(x) => raw_data = x,
-        _     => return Err("missing file")
-    }
+    let mut raw_data = fs::read_to_string(filename)?;
+
     // strips the contents that are not 0-9 or whitespace
-    raw_data.retain(|c| c == ' ' ||
-                        c == '0' ||
-                        c == '1' ||
-                        c == '2' ||
-                        c == '3' ||
-                        c == '4' ||
-                        c == '5' ||
-                        c == '6' ||
-                        c == '7' ||
-                        c == '8' ||
-                        c == '9');
+    raw_data.retain(|c| c == ' ' || c == '0' || c == '1' ||
+                        c == '2' || c == '3' || c == '4' ||
+                        c == '5' || c == '6' || c == '7' ||
+                        c == '8' || c == '9');
+                        
     // take each of those chunks and plop it in an element of Vec<u32>
     let split_data = raw_data.split_whitespace();
     let mut parsed_data: Vec<u32> = vec![];
     for chunk in split_data {
-        match chunk.parse::<u32>() {
-            Ok(x) => parsed_data.push(x),
-            _ => return Err("sanitizing big num")
-        }
+        parsed_data.push(chunk.parse::<u32>()?);
     }
 
     // create the desired bignum from the vector
     let bignum = BigUint::new(parsed_data);
 
     Ok(bignum)
+}
+
+// Code taken from here.
+// https://doc.rust-lang.org/std/convert/trait.From.html
+// Inspiration from here and Rust-By-Example
+// https://stackoverflow.com/questions/42584368/how-do-you-define-custom-error-types-in-rust
+#[derive(Debug)]
+enum CliError {
+    IoError(io::Error),
+    ParseError(num::ParseIntError)
+}
+
+impl fmt::Display for CliError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "print your error msg here")
+    }
+}
+
+// Need to impl From so these errors can be used with `?`
+impl From<io::Error> for CliError {
+    fn from(error: io::Error) -> Self {
+        CliError::IoError(error)
+    }
+}
+
+impl From<num::ParseIntError> for CliError {
+    fn from(error: num::ParseIntError) -> Self {
+        CliError::ParseError(error)
+    }
 }
