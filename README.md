@@ -52,6 +52,9 @@ TODO
 There should be some tags and commit messages indicating a working program,
 more specifically version v0.1.0 and v0.2.0 
 
+# TODO
+Change `sanitize_big_num` to `sanitize_bignum`
+
 # Licensing
 Refer to the LICENSE file in the repo.
 
