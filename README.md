@@ -42,18 +42,13 @@ by Bob, and vice-versa. The priavte key however, would not be known. The
 session key is what makes all this work worthwhile, and we can use it to 
 generate a symmetric key for use with an different cryptographic protocol.
 
-## Running Tests
-TODO 
+# Keys
 
-## Contributing
-TODO
+The keys in this code remain because they're for demonstration purposes. 
 
 ## Versioning 
 There should be some tags and commit messages indicating a working program,
 more specifically version v0.1.0 and v0.2.0 
-
-# TODO
-Change `sanitize_big_num` to `sanitize_bignum`
 
 # Licensing
 Refer to the LICENSE file in the repo.
